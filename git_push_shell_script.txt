@@ -1,0 +1,72 @@
+#!/bin/bash
+timestamp=$(date +"%Y_%m_%d_T_%H_%M")
+echo "$timestamp"
+if [ "git status --porcelain --untracked-files=no" ]
+ then
+	# Changes
+	echo $(git status --porcelain --untracked-files=no)
+	git add .
+	read -p "additional string for commit message "  u_input
+	git commit -m "$timestamp $u_input"
+	git push origin master
+else
+	# No changes
+	echo "no changes according to git status --porcelain"
+fi
+
+UPSTREAM=${1:-'@{u}'}
+LOCAL=$(git rev-parse @)
+REMOTE=$(git rev-parse "$UPSTREAM")
+BASE=$(git merge-base @ "$UPSTREAM")
+
+if [ $LOCAL = $REMOTE ]; then
+    echo "Up-to-date"
+elif [ $LOCAL = $BASE ]; then
+    echo "Need to pull"
+elif [ $REMOTE = $BASE ]; then
+    echo "Need to push"
+	git add .
+	read -p "additional string for commit message "  u_input
+	git commit -m "$timestamp $u_input"
+	git push origin master
+else
+    echo "Diverged"
+fi
+
+sleep 5
+
+#First use git remote update, to bring your remote refs up to date. Then you can do one of several things, such as:
+
+#git status -uno will tell you whether the branch you are tracking is ahead, behind or has diverged. If it says nothing, the local and remote are the same.
+
+#git show-branch *master will show you the commits in all of the branches whose names end in master (eg master and origin/master).
+
+#If you use -v with git remote update (git remote -v update) you can see which branches got updated, so you dont really need any further commands.
+
+#However, it looks like you want to do this in a script or program and end up with a true/false value. If so, there are ways to check the relationship between your current HEAD commit and the head of the branch youre tracking, although since there are four possible outcomes you cant reduce it to a yes/no answer. However, if youre prepared to do a pull --rebase then you can treat "local is behind" and "local has diverged" as "need to pull", and the other two as "dont need to pull".
+
+#You can get the commit id of any ref using git rev-parse <ref>, so you can do this for master and origin/master and compare them. If theyre equal, the branches are the same. If theyre unequal, you want to know which is ahead of the other. Using git merge-base master origin/master will tell you the common ancestor of both branches, and if they havent diverged this will be the same as one or the other. If you get three different ids, the branches have diverged.
+
+#To do this properly, eg in a script, you need to be able to refer to the current branch, and the remote branch its tracking. The bash prompt-setting function in /etc/bash_completion.d has some useful code for getting branch names. However, you probably dont actually need to get the names. Git has some neat shorthands for referring to branches and commits (as documented in git rev-parse --help). In particular, you can use @ for the current branch (assuming youre not in a detached-head state) and @{u} for its upstream branch (eg origin/master). So git merge-base @ @{u} will return the (hash of the) commit at which the current branch and its upstream diverge and git rev-parse @ and git rev-parse @{u} will give you the hashes of the two tips. This can be summarized in the following script:
+
+##!/bin/sh
+
+#UPSTREAM=${1:-@'{u}'} 
+#LOCAL=$(git rev-parse @)
+#REMOTE=$(git rev-parse "$UPSTREAM")
+#BASE=$(git merge-base @ "$UPSTREAM")
+
+#if [ $LOCAL = $REMOTE ]; then
+#    echo "Up-to-date"
+#elif [ $LOCAL = $BASE ]; then
+#    echo "Need to pull"
+#elif [ $REMOTE = $BASE ]; then
+#    echo "Need to push"
+#else
+#    echo "Diverged"
+#fi
+#Note: older versions of git didnt allow @ on its own, so you may have to use @{0} instead.
+
+#The line UPSTREAM=${1:-@{u}} allows you optionally to pass an upstream branch explicitly, in case you want to check against a different remote branch than the one configured for the current branch. This would typically be of the form remotename/branchname. If no parameter is given, the value defaults to @{u}.
+
+#The script assumes that youve done a git fetch or git remote update first, to bring the tracking branches up to date. I didnt build this into the script because its more flexible to be able to do the fetching and the comparing as separate operations, for example if you want to compare without fetching because you already fetched recently.
