@@ -1,0 +1,17 @@
+#tell travis what to do when we push a change to our project
+#what language to expect
+language: python
+python:
+#at the time of starting project, 3.6 was latest on stable channel on travis. this does not matter since we are going to use the travis server is to run docker whihc contains the right version 
+  - "3.6"
+
+#what services we need to use, docker service, sub services are in docker compose file and docker config 
+services:
+  - docker
+
+#scripts to execute before automation
+before_script: pip install docker-compose
+
+#scripts to run. everytime we push to git, travis will spin up a python server running 3.6, make docker service available, use pip install docker compose and run script
+script:
+  - docker-compose run app sh -c "python manage.py test && flake8"
